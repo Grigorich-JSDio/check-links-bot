@@ -2,6 +2,8 @@ import telethon
 import xlwt
 from aiogram import types
 from aiogram.dispatcher import FSMContext
+from telethon.tl.functions.messages import CheckChatInviteRequest
+from telethon import errors
 import asyncio
 import datetime
 import re
@@ -11,12 +13,16 @@ from data.config import api_id, api_hash
 from telethon.sync import TelegramClient, events
 
 
+privlink_pattern = r'http[s]{0,1}://t.me/joinchat/[0-9a-z\-_]{1}[a-z_\-0-9]{4,}$'
+
+
 def get_links():
     links = []
     with open('links.txt', encoding='UTF-8') as f:
         for line in f:
             if re.match('http[s]{0,1}://t.me/[a-z]{1,}[a-z0-9_]{4,31}$', line) or re.match(
-                    '@{0,1}[a-z]{1,}[a-z0-9_]{4,31}$', line.lower()):
+                    '@{0,1}[a-z]{1,}[a-z0-9_]{4,31}$', line.lower()) or re.match(
+                    r'http[s]{0,1}://t.me/joinchat/[0-9a-z\-_]{1}[a-z_\-0-9]{4,}$', line.lower()):
                 links.append(line.replace('\n', ''))
     if len(links) == 0:
         return 'error', 'В вашем файле нет ни одной ссылки'
@@ -29,11 +35,31 @@ async def check_link(links):
         users = []
         channels = []
         chats = []
+        priv_chats = []
         end_status = 'success'
         end_mess = 'Операция завершена успешно. Высылаем файл с результатами.'
         for x in links:
             try:
-                ch = await client.get_entity(x)
+                if re.match(privlink_pattern, x.lower()):
+                    hash = x.rsplit('/', 1)[1]
+                    try:
+                        ch = await client(CheckChatInviteRequest(hash))
+                        if ch.__class__.__name__ == 'ChatInviteAlready':
+                            if ch.chat.__class__.__name__ == 'Channel':
+                                if ch.chat.megagroup is True:
+                                    chats.append({'id': ch.chat.id, 'url': x, 'title': ch.chat.title})
+                                else:
+                                    channels.append({'id': ch.chat.id, 'url': ch.chat.username, 'title': ch.chat.title})
+                        elif ch.__class__.__name__ == 'ChatInvite':
+                            if ch.megagroup is True:
+                                priv_chats.append({'hash': hash, 'url': x, 'title': ch.title})
+                            else:
+                                continue
+                    except errors.InviteHashEmptyError or errors.InviteHashExpiredError or \
+                        errors.InviteHashInvalidError:
+                        continue
+                else:
+                    ch = await client.get_entity(x)
                 if ch.__class__.__name__ == 'Channel':
                     if ch.megagroup is True:
                         chats.append({'id': ch.id, 'url': ch.username, 'title': ch.title})
@@ -88,6 +114,18 @@ async def check_link(links):
                     sheet.write(n, 0, chats[q]['id'])
                     sheet.write(n, 1, chats[q]['url'])
                     sheet.write(n, 2, chats[q]['title'])
+                    n += 1
+            if len(priv_chats) > 0:
+                total_lists += 1
+                sheet = wb.add_sheet(f'Private Chats')
+                sheet.write(0, 0, 'Hash')
+                sheet.write(0, 1, 'URL')
+                sheet.write(0, 2, 'Title')
+                n = 1
+                for q in range(len(priv_chats)):
+                    sheet.write(n, 0, priv_chats[q]['hash'])
+                    sheet.write(n, 1, priv_chats[q]['url'])
+                    sheet.write(n, 2, priv_chats[q]['title'])
                     n += 1
         time_now = datetime.datetime.now().strftime("%d-%m-%y %H_%M_%S")
         filename = f'Результаты {time_now}.xls'
