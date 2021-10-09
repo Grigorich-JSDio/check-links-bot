@@ -55,6 +55,9 @@ async def check_link(links):
                                 priv_chats.append({'hash': hash, 'url': x, 'title': ch.title})
                             else:
                                 continue
+                        elif ch.__class__.__name__ == 'ChatInvitePeek':
+                            if ch.chat.megagroup is False:
+                                channels.append({'id': ch.chat.id, 'url': ch.chat.username, 'title': ch.chat.title})
                     except errors.InviteHashEmptyError or errors.InviteHashExpiredError or \
                         errors.InviteHashInvalidError:
                         continue
