@@ -20,7 +20,7 @@ def get_links():
     links = []
     with open('links.txt', encoding='UTF-8') as f:
         for line in f:
-            if re.match('http[s]{0,1}://t.me/[a-z]{1,}[a-z0-9_]{4,31}$', line) or re.match(
+            if re.match('http[s]{0,1}://t.me/[a-z]{1,}[a-z0-9_]{4,31}$', line.lower()) or re.match(
                     '@{0,1}[a-z]{1,}[a-z0-9_]{4,31}$', line.lower()) or re.match(
                     r'http[s]{0,1}://t.me/joinchat/[0-9a-z\-_]{1}[a-z_\-0-9]{4,}$', line.lower()):
                 links.append(line.replace('\n', ''))
