@@ -58,11 +58,17 @@ async def check_link(links):
                         elif ch.__class__.__name__ == 'ChatInvitePeek':
                             if ch.chat.megagroup is False:
                                 channels.append({'id': ch.chat.id, 'url': ch.chat.username, 'title': ch.chat.title})
-                    except errors.InviteHashEmptyError or errors.InviteHashExpiredError or \
-                        errors.InviteHashInvalidError:
+                    except errors.InviteHashEmptyError:
+                        continue
+                    except errors.InviteHashExpiredError:
+                        continue
+                    except errors.InviteHashInvalidError:
                         continue
                 else:
-                    ch = await client.get_entity(x)
+                    try:
+                        ch = await client.get_entity(x)
+                    except errors.UsernameInvalidError:
+                        continue
                 if ch.__class__.__name__ == 'Channel':
                     if ch.megagroup is True:
                         chats.append({'id': ch.id, 'url': ch.username, 'title': ch.title})
