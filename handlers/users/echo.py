@@ -32,10 +32,8 @@ def get_links():
 
 async def check_link(links):
     async with TelegramClient('anon', api_id, api_hash) as client:
-        users = []
-        channels = []
-        chats = []
-        priv_chats = []
+        badlinks = []
+        active_links = []
         end_status = 'success'
         end_mess = 'Операция завершена успешно. Высылаем файл с результатами.'
         for x in links:
@@ -44,41 +42,25 @@ async def check_link(links):
                     hash = x.rsplit('/', 1)[1]
                     try:
                         ch = await client(CheckChatInviteRequest(hash))
-                        if ch.__class__.__name__ == 'ChatInviteAlready':
-                            if ch.chat.__class__.__name__ == 'Channel':
-                                if ch.chat.megagroup is True:
-                                    chats.append({'id': ch.chat.id, 'url': x, 'title': ch.chat.title})
-                                else:
-                                    channels.append({'id': ch.chat.id, 'url': ch.chat.username, 'title': ch.chat.title})
-                        elif ch.__class__.__name__ == 'ChatInvite':
-                            if ch.megagroup is True:
-                                priv_chats.append({'hash': hash, 'url': x, 'title': ch.title})
-                            else:
-                                continue
-                        elif ch.__class__.__name__ == 'ChatInvitePeek':
-                            if ch.chat.megagroup is False:
-                                channels.append({'id': ch.chat.id, 'url': ch.chat.username, 'title': ch.chat.title})
+                        active_links.append(x)
                     except errors.InviteHashEmptyError:
+                        badlinks.append(x)
                         continue
                     except errors.InviteHashExpiredError:
+                        badlinks.append(x)
                         continue
                     except errors.InviteHashInvalidError:
+                        badlinks.append(x)
                         continue
                 else:
                     try:
                         ch = await client.get_entity(x)
+                        active_links.append(x)
                     except errors.UsernameInvalidError:
+                        badlinks.append(x)
                         continue
-                if ch.__class__.__name__ == 'Channel':
-                    if ch.megagroup is True:
-                        chats.append({'id': ch.id, 'url': ch.username, 'title': ch.title})
-                    else:
-                        channels.append({'id': ch.id, 'url': ch.username, 'title': ch.title})
-                elif ch.__class__.__name__ == 'User':
-                    name = ch.first_name
-                    if ch.last_name is not None:
-                        name = f'{name} {ch.last_name}'
-                    users.append({'id': ch.id, 'username': ch.username, 'full_name': name})
+                    except:
+                        badlinks.append(x)
                 time.sleep(1)
             except telethon.errors.FloodError as e:
                 end_status = 'flood_error'
@@ -86,61 +68,22 @@ async def check_link(links):
                 break
             except ValueError:
                 continue
-            wb = xlwt.Workbook()
-            total_lists = 0
-            if len(users) > 0:
-                total_lists += 1
-                sheet = wb.add_sheet(f'Users')
-                sheet.write(0, 0, 'User ID')
-                sheet.write(0, 1, 'Username')
-                sheet.write(0, 2, 'Full Name')
-                n = 1
-                for q in range(len(users)):
-                    sheet.write(n, 0, users[q]['id'])
-                    sheet.write(n, 1, users[q]['username'])
-                    sheet.write(n, 2, users[q]['full_name'])
-                    n += 1
-            if len(channels) > 0:
-                total_lists += 1
-                sheet = wb.add_sheet(f'Channels')
-                sheet.write(0, 0, 'Channel ID')
-                sheet.write(0, 1, 'URL')
-                sheet.write(0, 2, 'Title')
-                n = 1
-                for q in range(len(channels)):
-                    sheet.write(n, 0, channels[q]['id'])
-                    sheet.write(n, 1, channels[q]['url'])
-                    sheet.write(n, 2, channels[q]['title'])
-                    n += 1
-            if len(chats) > 0:
-                total_lists += 1
-                sheet = wb.add_sheet(f'Chats')
-                sheet.write(0, 0, 'Chat ID')
-                sheet.write(0, 1, 'URL')
-                sheet.write(0, 2, 'Title')
-                n = 1
-                for q in range(len(chats)):
-                    sheet.write(n, 0, chats[q]['id'])
-                    sheet.write(n, 1, chats[q]['url'])
-                    sheet.write(n, 2, chats[q]['title'])
-                    n += 1
-            if len(priv_chats) > 0:
-                total_lists += 1
-                sheet = wb.add_sheet(f'Private Chats')
-                sheet.write(0, 0, 'Hash')
-                sheet.write(0, 1, 'URL')
-                sheet.write(0, 2, 'Title')
-                n = 1
-                for q in range(len(priv_chats)):
-                    sheet.write(n, 0, priv_chats[q]['hash'])
-                    sheet.write(n, 1, priv_chats[q]['url'])
-                    sheet.write(n, 2, priv_chats[q]['title'])
-                    n += 1
+        filenames = []
         time_now = datetime.datetime.now().strftime("%d-%m-%y %H_%M_%S")
-        filename = f'Результаты {time_now}.xls'
-        wb.save(filename)
-        if total_lists != 0:
-            return end_status, end_mess, filename
+        if len(badlinks) > 0:
+            filename = f'Неактив {time_now}.txt'
+            with open(filename, 'w+') as f:
+                for link in badlinks:
+                    f.write(f'{link}\n')
+            filenames.append(filename)
+        if len(active_links) > 0:
+            filename = f'Актив {time_now}.txt'
+            with open(filename, 'w+') as f:
+                for link in active_links:
+                    f.write(f'{link}\n')
+            filenames.append(filename)
+        if len(filenames) != 0:
+            return end_status, end_mess, filenames
         else:
             return 'links_error', 'В вашем файле не было ни одной рабочей ссылки'
 
@@ -168,4 +111,5 @@ async def bot_echo(message: types.Message):
                 await message.answer(res[1])
             else:
                 await message.answer(res[1])
-                await message.answer_document(types.InputFile(res[2], filename=res[2]))
+                for x in res[2]:
+                    await message.answer_document(types.InputFile(x, filename=x))
