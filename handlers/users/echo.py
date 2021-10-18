@@ -64,7 +64,7 @@ async def check_link(links):
                 time.sleep(1)
             except telethon.errors.FloodError as e:
                 end_status = 'flood_error'
-                end_mess = f'К сожалению, на ваш аккаунт наложено временное ограничение в {e.seconds} секунд. Высылаем вам обработанные результаты.'
+                end_mess = f'К сожалению, на ваш аккаунт наложено временное ограничение в {e.seconds} секунд. Высылаем вам обработанные результаты. Последняя проверенная ссылка - {x}'
                 break
             except ValueError:
                 continue
